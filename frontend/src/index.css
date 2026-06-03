@@ -1,0 +1,280 @@
+/* =========================================
+   1. CONFIGURATION & THEMING
+   ========================================= */
+:root {
+  --bg-dark: #020617;
+  --panel-bg: #1e293b;
+  --border-color: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --blue-400: #60a5fa;
+  --orange-400: #fb923c;
+  --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* =========================================
+   2. GLOBAL RESET & LAYOUT
+   ========================================= */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  font-family: var(--font-main);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+/* Center-Aligned Layout */
+#root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Container for Header and Grid */
+.app-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* =========================================
+   3. SCROLLBAR STYLING
+   ========================================= */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* =========================================
+   4. CUSTOM RANGE SLIDERS
+   ========================================= */
+input[type='range'] {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+  margin: 8px 0;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px;
+  width: 18px;
+  background: #ffffff;
+  border: 2px solid var(--emerald-500);
+  border-radius: 50%;
+  margin-top: -6px; /* Center thumb */
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+/* =========================================
+   5. LEAFLET MAP FIX
+   ========================================= */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background: #0f172a !important;
+  border-radius: 16px;
+}
+
+/* =========================================
+   6. UI COMPONENT STYLES (NO TAILWIND)
+   ========================================= */
+
+/* Main Panels */
+.panel {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.panel-header {
+  color: var(--emerald-400);
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Forms & Inputs */
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px;
+  background-color: #0f172a;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  border-color: var(--emerald-500);
+}
+
+.grid-2-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Analysis Board - Gauge Container */
+.gauge-container {
+  position: relative;
+  height: 220px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.gauge-text-overlay {
+  position: absolute;
+  bottom: 20px; 
+  left: 0;
+  right: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.gauge-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1;
+}
+
+.gauge-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
+
+/* Analysis Board - Stats & Insights */
+.stat-card {
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.insight-box {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.75rem;
+  color: #a7f3d0;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* =========================================
+   7. UTILITIES
+   ========================================= */
+.font-mono {
+  font-family: 'ui-monospace', 'SFMono-Regular', Menlo, monospace;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+/* =========================================
+   8. MAIN DASHBOARD LAYOUT
+   ========================================= */
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* Keeps the text aligned nicely at the bottom */
+  width: 100%;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.dashboard-grid {
+  display: grid;
+  /* This creates exactly 3 equal columns */
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 24px;
+  width: 100%;
+  align-items: stretch; /* Ensures all panels stretch to the same height */
+}
+
+/* Responsive: Stacks them vertically on smaller screens (tablets/phones) */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Map specific wrapper so it matches the panel heights */
+.map-wrapper {
+  height: 600px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
