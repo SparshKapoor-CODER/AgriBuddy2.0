@@ -4,6 +4,8 @@
 
 AgriBuddy is an intelligent agricultural analytics platform that leverages geospatial data, machine learning, and modern cloud infrastructure to empower farmers and agricultural professionals with data-driven insights for crop yield prediction and soil management.
 
+![AgriBuddy Demo](frontend/demo/image.png)
+
 ---
 
 ## 🚀 Key Features
