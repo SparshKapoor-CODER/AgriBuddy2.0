@@ -1,51 +1,47 @@
+// src/services/api.js
 import axios from 'axios';
 
-// Create an instance with your FastAPI base URL
 const API = axios.create({
   baseURL: 'http://localhost:8000',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
 /**
- * Fetches default NPK and pH values based on the selected location.
+ * Fetch soil pH and average rainfall for a given location.
  */
-export const getSoilDefaults = async (district, state) => {
+export const getSoilByLatLon = async (lat, lon) => {
   try {
-    const res = await API.post('/get-soil-defaults', { district, state });
-    return res.data;
+    const res = await API.post('/get-soil-by-latlon', { lat, lon });
+    return res.data; // { avg_rainfall_mm, soil_ph }
   } catch (err) {
-    console.error("Error fetching soil defaults:", err);
-    // Return fallback values so the app doesn't crash
-    return { n: 50, p: 50, k: 50, ph: 7.0 };
+    console.error('Error fetching soil data:', err);
+    // Fallback values so the app doesn't break
+    return { avg_rainfall_mm: 1000, soil_ph: 7.0 };
   }
 };
 
 /**
- * Sends the 10-feature vector to the XGBoost model for prediction.
+ * Send prediction request to the backend.
  */
 export const getYieldPrediction = async (farmData) => {
   try {
-    // 1. Destructure to separate the UI-only fields (district) from the model fields
-    const { district, annual_rainfall, ...otherFeatures } = farmData;
-
-    // 2. Construct the payload exactly as the FastAPI PredictionRequest expects
     const payload = {
-      ...otherFeatures,
-      rainfall: parseFloat(annual_rainfall), // Mapping name and ensuring it's a number
-      n: parseFloat(farmData.n),
-      p: parseFloat(farmData.p),
-      k: parseFloat(farmData.k),
-      ph: parseFloat(farmData.ph),
+      crop: farmData.crop,
+      season: farmData.season,
+      state: farmData.state,
+      lat: parseFloat(farmData.lat),
+      lon: parseFloat(farmData.lon),
       fertilizer: parseFloat(farmData.fertilizer),
       pesticide: parseFloat(farmData.pesticide),
+      nitrogen: parseFloat(farmData.nitrogen),
+      phosphorus: parseFloat(farmData.phosphorus),
+      potassium: parseFloat(farmData.potassium),
+      soil_ph: parseFloat(farmData.soil_ph),
     };
-
     const res = await API.post('/predict', payload);
-    return res.data; // Should return { yield_prediction: X.XX }
+    return res.data; // { status, prediction: { min_yield, median_yield, max_yield, unit } }
   } catch (err) {
-    console.error("Prediction API Error:", err.response?.data || err.message);
+    console.error('Prediction API Error:', err.response?.data || err.message);
     throw err;
   }
 };

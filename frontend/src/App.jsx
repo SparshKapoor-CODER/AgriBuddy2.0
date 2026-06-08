@@ -1,71 +1,86 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
-import FarmMap from './components/FarmMap.jsx';
+import FarmMap from './components/FarmMap';
 import InputPanel from './components/InputPanel';
 import AnalysisBoard from './components/AnalysisBoard';
-import { getSoilDefaults, getYieldPrediction } from './services/api';
+import { getSoilByLatLon, getYieldPrediction } from './services/api';
 
 function App() {
   const [farmData, setFarmData] = useState({
-    crop: "Rice",
-    season: "Kharif",
-    state: "Punjab", 
-    district: "Rupnagar",
-    annual_rainfall: 1100,
+    crop: 'Rice',
+    season: 'Kharif',
+    state: 'Punjab',
+    district: 'Rupnagar',
+    lat: 30.97,
+    lon: 76.53,
+    annual_rainfall: 1100,   // for UI slider, not used in prediction
     fertilizer: 150,
     pesticide: 10,
-    n: 50, p: 50, k: 50, ph: 7.0
+    nitrogen: 50,
+    phosphorus: 50,
+    potassium: 50,
+    soil_ph: 7.0,
   });
 
   const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleLocationFound = async (loc) => {
+  // Called when user clicks on the map
+  const handleLocationFound = async (location) => {
+    const { lat, lng, district, state } = location;
     try {
-      const defaults = await getSoilDefaults(loc.district, loc.state);
-      setFarmData(prev => ({
+      const soilData = await getSoilByLatLon(lat, lng);
+      setFarmData((prev) => ({
         ...prev,
-        state: loc.state,
-        district: loc.district,
-        n: defaults.n,
-        p: defaults.p,
-        k: defaults.k,
-        ph: defaults.ph
+        lat,
+        lon: lng,
+        district: district || prev.district,
+        state: state || prev.state,
+        annual_rainfall: soilData.avg_rainfall_mm,
+        soil_ph: soilData.soil_ph,
       }));
     } catch (err) {
-      console.warn("Using fallback state averages due to API error.");
+      console.warn('Could not fetch soil data, using fallback values.');
+      // Still update lat/lon and location names
+      setFarmData((prev) => ({
+        ...prev,
+        lat,
+        lon: lng,
+        district: district || prev.district,
+        state: state || prev.state,
+      }));
     }
   };
 
+  // Debounced prediction whenever relevant fields change
   useEffect(() => {
-    const fetchPrediction = async () => {
-      setLoading(true);
-      try {
-        const result = await getYieldPrediction(farmData);
-        if (result.status === "success" && result.prediction) {
-          setPrediction(result.prediction.yield);
-        } else {
-          setPrediction(result.yield || result.yield_prediction || 0);
-        }
-      } catch (err) {
-        console.error("Prediction failed:", err);
-        setPrediction(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const timeoutId = setTimeout(() => {
-      if (farmData.crop && farmData.state) {
+      if (farmData.crop && farmData.state && farmData.lat && farmData.lon) {
         fetchPrediction();
       }
     }, 500);
-
     return () => clearTimeout(timeoutId);
   }, [farmData]);
 
+  const fetchPrediction = async () => {
+    setLoading(true);
+    try {
+      const result = await getYieldPrediction(farmData);
+      if (result.status === 'success' && result.prediction) {
+        setPrediction(result.prediction.median_yield);
+      } else {
+        setPrediction(0);
+      }
+    } catch (err) {
+      console.error('Prediction failed:', err);
+      setPrediction(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="app-container">
-      {/* Fixed Header Layout */}
       <header className="app-header">
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'var(--emerald-400)', marginBottom: '4px' }}>
@@ -81,28 +96,20 @@ function App() {
         </div>
       </header>
 
-      {/* Fixed Grid Layout - 3 Columns Side-by-Side */}
       <div className="dashboard-grid">
-        
-        {/* Left: Map View */}
         <div className="map-wrapper">
           <FarmMap onLocationFound={handleLocationFound} />
         </div>
-
-        {/* Center: Input Panel */}
         <div>
           <InputPanel farmData={farmData} setFarmData={setFarmData} />
         </div>
-
-        {/* Right: Analysis Board */}
         <div>
-          <AnalysisBoard 
-            prediction={prediction} 
-            loading={loading} 
-            farmData={farmData} 
+          <AnalysisBoard
+            prediction={prediction}
+            loading={loading}
+            farmData={farmData}
           />
         </div>
-        
       </div>
     </div>
   );
