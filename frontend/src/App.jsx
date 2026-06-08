@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import FarmMap from './components/FarmMap';
 import InputPanel from './components/InputPanel';
 import AnalysisBoard from './components/AnalysisBoard';
+import ChatBot from './components/ChatBot';
 import { getSoilByLatLon, getYieldPrediction } from './services/api';
 
 function App() {
@@ -13,19 +14,15 @@ function App() {
     district: 'Rupnagar',
     lat: 30.97,
     lon: 76.53,
-    annual_rainfall: 1100,   // for UI slider, not used in prediction
+    annual_rainfall: 1100,   // will be overwritten by soil lookup
+    soil_ph: 7.0,            // will be overwritten
     fertilizer: 150,
     pesticide: 10,
-    nitrogen: 50,
-    phosphorus: 50,
-    potassium: 50,
-    soil_ph: 7.0,
   });
 
   const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Called when user clicks on the map
   const handleLocationFound = async (location) => {
     const { lat, lng, district, state } = location;
     try {
@@ -41,7 +38,6 @@ function App() {
       }));
     } catch (err) {
       console.warn('Could not fetch soil data, using fallback values.');
-      // Still update lat/lon and location names
       setFarmData((prev) => ({
         ...prev,
         lat,
@@ -111,6 +107,8 @@ function App() {
           />
         </div>
       </div>
+
+      <ChatBot farmData={farmData} prediction={prediction} />
     </div>
   );
 }
