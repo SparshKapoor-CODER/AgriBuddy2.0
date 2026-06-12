@@ -107,7 +107,7 @@ const InputPanel = ({ farmData, setFarmData }) => {
           <select name="season" value={farmData.season} onChange={handleChange} className="input-field">
             <option value="Kharif">Kharif</option>
             <option value="Rabi">Rabi</option>
-            <option value="Summer">Summer</option>
+            <option value="Summer">Whole Year</option>
           </select>
         </div>
       </div>
