@@ -43,13 +43,67 @@ const InputPanel = ({ farmData, setFarmData }) => {
           </div>
         </div>
 
-        {/* Crop & Season dropdowns */}
+        {/* Crop & Season dropdowns - UPDATED with 55 crops */}
         <div className="grid-2-col" style={{ paddingTop: '10px' }}>
           <select name="crop" value={farmData.crop} onChange={handleChange} className="input-field">
-            <option value="Rice">Rice</option>
+            <option value="">Select Crop</option>
+            <option value="Arecanut">Arecanut</option>
+            <option value="Arhar/Tur">Arhar/Tur</option>
+            <option value="Bajra">Bajra</option>
+            <option value="Banana">Banana</option>
+            <option value="Barley">Barley</option>
+            <option value="Black pepper">Black pepper</option>
+            <option value="Cardamom">Cardamom</option>
+            <option value="Cashewnut">Cashewnut</option>
+            <option value="Castor seed">Castor seed</option>
+            <option value="Coconut">Coconut</option>
+            <option value="Coriander">Coriander</option>
+            <option value="Cotton(lint)">Cotton(lint)</option>
+            <option value="Cowpea(Lobia)">Cowpea(Lobia)</option>
+            <option value="Dry chillies">Dry chillies</option>
+            <option value="Garlic">Garlic</option>
+            <option value="Ginger">Ginger</option>
+            <option value="Gram">Gram</option>
+            <option value="Groundnut">Groundnut</option>
+            <option value="Guar seed">Guar seed</option>
+            <option value="Horse-gram">Horse-gram</option>
+            <option value="Jowar">Jowar</option>
+            <option value="Jute">Jute</option>
+            <option value="Khesari">Khesari</option>
+            <option value="Linseed">Linseed</option>
             <option value="Maize">Maize</option>
+            <option value="Masoor">Masoor</option>
+            <option value="Mesta">Mesta</option>
+            <option value="Moong(Green Gram)">Moong(Green Gram)</option>
+            <option value="Moth">Moth</option>
+            <option value="Niger seed">Niger seed</option>
+            <option value="Oilseeds total">Oilseeds total</option>
+            <option value="Onion">Onion</option>
+            <option value="Other Rabi pulses">Other Rabi pulses</option>
+            <option value="Other Cereals">Other Cereals</option>
+            <option value="Other Kharif pulses">Other Kharif pulses</option>
+            <option value="Other Summer Pulses">Other Summer Pulses</option>
+            <option value="Peas & beans (Pulses)">Peas & beans (Pulses)</option>
+            <option value="Potato">Potato</option>
+            <option value="Ragi">Ragi</option>
+            <option value="Rapeseed &Mustard">Rapeseed &Mustard</option>
+            <option value="Rice">Rice</option>
+            <option value="Safflower">Safflower</option>
+            <option value="Sannhamp">Sannhamp</option>
+            <option value="Sesamum">Sesamum</option>
+            <option value="Small millets">Small millets</option>
+            <option value="Soyabean">Soyabean</option>
+            <option value="Sugarcane">Sugarcane</option>
+            <option value="Sunflower">Sunflower</option>
+            <option value="Sweet potato">Sweet potato</option>
+            <option value="Tapioca">Tapioca</option>
+            <option value="Tobacco">Tobacco</option>
+            <option value="Turmeric">Turmeric</option>
+            <option value="Urad">Urad</option>
             <option value="Wheat">Wheat</option>
+            <option value="other oilseeds">other oilseeds</option>
           </select>
+          
           <select name="season" value={farmData.season} onChange={handleChange} className="input-field">
             <option value="Kharif">Kharif</option>
             <option value="Rabi">Rabi</option>
