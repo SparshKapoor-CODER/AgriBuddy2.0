@@ -10,3 +10,6 @@ joblib==1.4.2
 groq==0.16.0
 python-dotenv==1.0.1
 pandas==2.2.3
+fpdf2==2.8.7
+weasyprint==69.0
+xhtml2pdf==0.2.17

@@ -1,13 +1,32 @@
 import os
+import uuid
+import tempfile
+import base64
 import joblib
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from scipy.spatial import cKDTree
 from dotenv import load_dotenv
 from groq import Groq
 import logging
+import matplotlib.pyplot as plt
+import io
+
+# ----------------------------
+# Configuration & Language List
+# ----------------------------
+INDIAN_LANGUAGES = {
+    "Assamese": "as", "Bengali": "bn", "Bodo": "brx", "Dogri": "doi",
+    "Gujarati": "gu", "Hindi": "hi", "Kannada": "kn", "Kashmiri": "ks",
+    "Konkani": "kok", "Maithili": "mai", "Malayalam": "ml", "Manipuri": "mni",
+    "Marathi": "mr", "Nepali": "ne", "Odia": "or", "Punjabi": "pa",
+    "Sanskrit": "sa", "Santhali": "sat", "Sindhi": "sd", "Tamil": "ta",
+    "Telugu": "te", "Urdu": "ur", "English": "en"
+}
+SCRIPT_OPTIONS = ["Native script", "Roman (transliterated)"]
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -23,25 +42,20 @@ app.add_middleware(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
-DATA_DIR = os.path.join(BASE_DIR, "..", "data")
 
-# Load encoders and scaler
+# Load models
 le_crop = joblib.load(os.path.join(MODEL_DIR, "le_crop.pkl"))
 le_season = joblib.load(os.path.join(MODEL_DIR, "le_season.pkl"))
 le_state = joblib.load(os.path.join(MODEL_DIR, "le_state.pkl"))
 scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.pkl"))
-
-# Load Random Forest model
 rf_model = joblib.load(os.path.join(MODEL_DIR, "yield_model_median_rf.pkl"))
 logger.info(f"Random Forest expects {rf_model.n_features_in_} features")
 
-# Load geo lookup (created by 05_geo_lookup_prep.ipynb)
 geo_lookup = joblib.load(os.path.join(BASE_DIR, "geo_lookup.pkl"))
 geo_tree = geo_lookup["tree"]
-geo_climate = geo_lookup["values_climate"]   # shape (n, 2): [avg_rainfall_mm, soil_ph]
-geo_npk = geo_lookup["values_NPK"]           # shape (n, 3): [Nitrogen, Phosphorous, Potassium]
+geo_climate = geo_lookup["values_climate"]
+geo_npk = geo_lookup["values_NPK"]
 
-# Groq client
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if GROQ_API_KEY:
     groq_client = Groq(api_key=GROQ_API_KEY)
@@ -49,28 +63,9 @@ else:
     groq_client = None
     logger.warning("GROQ_API_KEY not set – chatbot will not work.")
 
-class SoilRequest(BaseModel):
-    lat: float
-    lon: float
-
-class PredictionRequest(BaseModel):
-    crop: str
-    season: str
-    state: str
-    lat: float
-    lon: float
-    fertilizer: float
-    pesticide: float
-    # The following fields are kept for compatibility but will be overridden by geo lookup
-    nitrogen: float = None   # optional, ignored
-    phosphorus: float = None
-    potassium: float = None
-    soil_ph: float = None
-
-class ChatRequest(BaseModel):
-    message: str
-    context: dict
-
+# ----------------------------
+# Helper Functions
+# ----------------------------
 def robust_encode(encoder, value, name="unknown"):
     cleaned = value.strip().upper()
     try:
@@ -86,12 +81,6 @@ def robust_encode(encoder, value, name="unknown"):
     return 0
 
 def get_season_dummies(season_enc):
-    """
-    Map season label to 3 one‑hot dummies.
-    The training used: Kharif → [1,0,0], Rabi → [0,1,0], Summer → [0,0,1],
-    Autumn and others → [0,0,0].
-    (Assumes season_enc values correspond to: 1=Kharif, 2=Rabi, 3=Summer)
-    """
     dummies = [0, 0, 0]
     if season_enc == 1:   # Kharif
         dummies = [1, 0, 0]
@@ -99,33 +88,197 @@ def get_season_dummies(season_enc):
         dummies = [0, 1, 0]
     elif season_enc == 3: # Summer
         dummies = [0, 0, 1]
-    # Autumn and others remain [0,0,0]
     return dummies
 
 def prepare_features(crop, season, state, fertilizer, pesticide, nitrogen, phosphorus, potassium, soil_ph, area_ha=1.0):
-    # 1. Encode categoricals
     crop_enc = robust_encode(le_crop, crop, "crop")
     season_enc = robust_encode(le_season, season, "season")
     state_enc = robust_encode(le_state, state, "state")
-
-    # 2. Season dummies (3 features)
     season_dummies = get_season_dummies(season_enc)
-
-    # 3. Numerical features (7 features)
     fertilizer_per_ha = fertilizer / area_ha
     pesticide_per_ha = pesticide / area_ha
     log_area = np.log1p(area_ha)
     num_raw = np.array([fertilizer_per_ha, pesticide_per_ha, log_area,
                         nitrogen, phosphorus, potassium, soil_ph]).reshape(1, -1)
     num_scaled = scaler.transform(num_raw).flatten()
-
-    # 4. Combine: crop_enc, season_enc, state_enc, 3 dummies, 7 numericals → total 13
     features = np.concatenate([
         [crop_enc, season_enc, state_enc],
         season_dummies,
         num_scaled
     ])
     return features.reshape(1, -1)
+
+def generate_yield_chart(predicted_yield: float, regional_avg: float = 8.5) -> bytes:
+    fig, ax = plt.subplots(figsize=(5, 3))
+    categories = ['Predicted Yield', 'Regional Avg']
+    values = [predicted_yield, regional_avg]
+    colors_bar = ['#10b981', '#60a5fa']
+    bars = ax.bar(categories, values, color=colors_bar, edgecolor='white', linewidth=1.5)
+    ax.set_ylabel('Tons / Hectare')
+    ax.set_title('Yield Comparison')
+    ax.set_ylim(0, max(values) + 3)
+    for bar, val in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.2,
+                f'{val:.1f}', ha='center', va='bottom', fontweight='bold')
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    img_bytes = io.BytesIO()
+    plt.savefig(img_bytes, format='png', dpi=100)
+    plt.close()
+    img_bytes.seek(0)
+    return img_bytes.getvalue()
+
+def generate_report_text(crop, season, state, yield_median, soil_ph, rainfall,
+                         nitrogen, phosphorus, potassium, fertilizer, pesticide,
+                         language_name: str, script: str) -> str:
+    system_msg = f"""
+You are an expert agricultural advisor. Write a detailed, farmer‑friendly report in **{language_name}** language.
+Use the **{script}** script (e.g., for Hindi use Devanagari, for Roman use Latin alphabet).
+The report must be structured exactly as follows, using the data provided:
+
+1. Farm Summary: Crop, season, state, fertilizer used (kg/ha), pesticide used (kg/ha).
+2. Soil Health: pH value, N-P-K levels, annual rainfall.
+3. Yield Forecast: Predicted yield (tons/ha) and a simple interpretation (low/medium/high).
+4. Key Insights: 5-7 points explaining what the numbers mean for this farm.
+5. Recommendations: 8-10 actionable steps to improve yield, soil health, or reduce cost.
+6. Closing Advice: 3-4 encouraging sentences.
+
+Use plain, simple words. No markdown. Write in paragraphs, not bullet points.
+Separate sections with blank lines.
+"""
+    user_prompt = f"""
+Crop: {crop}
+Season: {season}
+State: {state}
+Fertilizer: {fertilizer} kg/ha
+Pesticide: {pesticide} kg/ha
+Soil pH: {soil_ph:.1f}
+Nitrogen: {nitrogen:.0f} kg/ha
+Phosphorus: {phosphorus:.0f} kg/ha
+Potassium: {potassium:.0f} kg/ha
+Annual rainfall: {rainfall:.0f} mm
+Predicted yield: {yield_median:.1f} tons/ha
+
+Generate the report in {language_name} ({script} script).
+"""
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=2000
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"LLM report generation failed: {e}")
+        return f"Report generation failed. Please try again later. (Error: {str(e)})"
+
+def build_farmer_html(report_text: str, chart_bytes: bytes, report_id: str) -> str:
+    """Generate an HTML report (works for all languages/scripts)."""
+    temp_dir = tempfile.gettempdir()
+    html_path = os.path.join(temp_dir, f"farmer_report_{report_id}.html")
+    
+    chart_b64 = base64.b64encode(chart_bytes).decode('utf-8')
+    
+    # Convert plain text paragraphs to HTML <p>
+    html_body = ""
+    for para in report_text.split('\n\n'):
+        if para.strip():
+            # Escape HTML special characters
+            para_escaped = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Replace newlines with <br>
+            para_escaped = para_escaped.replace('\n', '<br>')
+            html_body += f"<p>{para_escaped}</p>\n"
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AgriBuddy Report</title>
+    <style>
+        body {{
+            font-family: 'Noto Sans', 'Noto Sans Devanagari', 'Nirmala UI', 'Arial Unicode MS', 'Segoe UI', sans-serif;
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1rem;
+            line-height: 1.6;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }}
+        h1 {{
+            color: #10b981;
+            border-bottom: 2px solid #10b981;
+            padding-bottom: 0.5rem;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 1rem 0;
+        }}
+        .footer {{
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #64748b;
+            text-align: center;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 1rem;
+        }}
+    </style>
+</head>
+<body>
+    <h1>🌾 AgriBuddy AI – Detailed Crop Report</h1>
+    <img src="data:image/png;base64,{chart_b64}" alt="Yield Chart">
+    {html_body}
+    <div class="footer">
+        Generated by AgriBuddy AI • Data based on real‑time soil & climate analysis
+    </div>
+</body>
+</html>"""
+    
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    logger.info(f"HTML report saved to {html_path}")
+    return html_path
+
+# ----------------------------
+# API Endpoints
+# ----------------------------
+class SoilRequest(BaseModel):
+    lat: float
+    lon: float
+
+class PredictionRequest(BaseModel):
+    crop: str
+    season: str
+    state: str
+    lat: float
+    lon: float
+    fertilizer: float
+    pesticide: float
+    nitrogen: float = None
+    phosphorus: float = None
+    potassium: float = None
+    soil_ph: float = None
+
+class ChatRequest(BaseModel):
+    message: str
+    context: dict
+
+class ReportRequest(BaseModel):
+    crop: str
+    season: str
+    state: str
+    lat: float
+    lon: float
+    fertilizer: float
+    pesticide: float
+    language: str
+    script: str
 
 @app.get("/health")
 async def health():
@@ -144,24 +297,16 @@ async def get_soil_by_latlon(req: SoilRequest):
 @app.post("/predict")
 async def predict_yield(req: PredictionRequest):
     try:
-        # Find nearest GEE point
         dist, idx = geo_tree.query([[req.lon, req.lat]])
-        # Get NPK and soil pH from the lookup (override user inputs)
         rainfall, soil_ph = geo_climate[idx[0]]
         nitrogen, phosphorus, potassium = geo_npk[idx[0]]
-        
-        logger.info(f"Using geo values: pH={soil_ph:.2f}, N={nitrogen:.2f}, P={phosphorus:.2f}, K={potassium:.2f}")
-        
         X = prepare_features(
             crop=req.crop, season=req.season, state=req.state,
             fertilizer=req.fertilizer, pesticide=req.pesticide,
-            nitrogen=float(nitrogen),
-            phosphorus=float(phosphorus),
-            potassium=float(potassium),
-            soil_ph=float(soil_ph)
+            nitrogen=float(nitrogen), phosphorus=float(phosphorus),
+            potassium=float(potassium), soil_ph=float(soil_ph)
         )
         median = float(rf_model.predict(X)[0])
-        # Yield range as ±2 tons/ha
         lower = max(0, median - 2.0)
         upper = median + 2.0
         return {
@@ -172,7 +317,7 @@ async def predict_yield(req: PredictionRequest):
                 "max_yield": round(upper, 2),
                 "unit": "tons/hectare"
             },
-            "soil_data": {   # optional: return the actual values used
+            "soil_data": {
                 "soil_ph": float(soil_ph),
                 "nitrogen": float(nitrogen),
                 "phosphorus": float(phosphorus),
@@ -182,6 +327,38 @@ async def predict_yield(req: PredictionRequest):
         }
     except Exception as e:
         logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/generate-report")
+async def generate_report(req: ReportRequest):
+    try:
+        dist, idx = geo_tree.query([[req.lon, req.lat]])
+        rainfall, soil_ph = geo_climate[idx[0]]
+        nitrogen, phosphorus, potassium = geo_npk[idx[0]]
+        X = prepare_features(
+            crop=req.crop, season=req.season, state=req.state,
+            fertilizer=req.fertilizer, pesticide=req.pesticide,
+            nitrogen=float(nitrogen), phosphorus=float(phosphorus),
+            potassium=float(potassium), soil_ph=float(soil_ph)
+        )
+        median_yield = float(rf_model.predict(X)[0])
+        
+        report_text = generate_report_text(
+            crop=req.crop, season=req.season, state=req.state,
+            yield_median=median_yield, soil_ph=soil_ph, rainfall=rainfall,
+            nitrogen=nitrogen, phosphorus=phosphorus, potassium=potassium,
+            fertilizer=req.fertilizer, pesticide=req.pesticide,
+            language_name=req.language, script=req.script
+        )
+        
+        chart_bytes = generate_yield_chart(median_yield, regional_avg=8.5)
+        report_id = str(uuid.uuid4())[:8]
+        html_path = build_farmer_html(report_text, chart_bytes, report_id)
+        
+        return FileResponse(html_path, media_type='text/html',
+                            filename=f"AgriBuddy_Report_{report_id}.html")
+    except Exception as e:
+        logger.error(f"Report generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
@@ -208,8 +385,7 @@ Provide concise, practical advice tailored to these conditions. Answer in 2‑3 
             temperature=0.7,
             max_tokens=256
         )
-        answer = response.choices[0].message.content
-        return {"response": answer}
+        return {"response": response.choices[0].message.content}
     except Exception as e:
         logger.error(f"Groq error: {e}")
         raise HTTPException(status_code=500, detail="Chatbot error")
