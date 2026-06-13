@@ -1,7 +1,15 @@
 // src/components/InputPanel.jsx
 import React from 'react';
 
-const InputPanel = ({ farmData, setFarmData }) => {
+// 22 Official Languages of India (as per 8th Schedule)
+const INDIAN_LANGUAGES = [
+  "Assamese", "Bengali", "Bodo", "Dogri", "Gujarati", "Hindi", "Kannada",
+  "Kashmiri", "Konkani", "Maithili", "Malayalam", "Manipuri", "Marathi",
+  "Nepali", "Odia", "Punjabi", "Sanskrit", "Santhali", "Sindhi", "Tamil",
+  "Telugu", "Urdu","English"
+];
+
+const InputPanel = ({ farmData, setFarmData, onGenerateReport, loadingReport }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFarmData({ ...farmData, [name]: value });
@@ -15,7 +23,8 @@ const InputPanel = ({ farmData, setFarmData }) => {
       </h2>
 
       <div className="custom-scrollbar" style={{ overflowY: 'auto', paddingRight: '8px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Rainfall is now read-only, shown in AnalysisBoard */}
+        
+        {/* Location info (read‑only) */}
         <div className="input-group">
           <div className="input-label">
             <span>Location</span>
@@ -43,7 +52,7 @@ const InputPanel = ({ farmData, setFarmData }) => {
           </div>
         </div>
 
-        {/* Crop & Season dropdowns - UPDATED with 55 crops */}
+        {/* Crop & Season dropdowns */}
         <div className="grid-2-col" style={{ paddingTop: '10px' }}>
           <select name="crop" value={farmData.crop} onChange={handleChange} className="input-field">
             <option value="">Select Crop</option>
@@ -109,6 +118,69 @@ const InputPanel = ({ farmData, setFarmData }) => {
             <option value="Rabi">Rabi</option>
             <option value="Summer">Whole Year</option>
           </select>
+        </div>
+
+        {/* ========= NEW: Language & Script for Report ========= */}
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '8px' }}>
+          <div className="input-group">
+            <div className="input-label">📄 Report Language</div>
+            <select
+              name="reportLanguage"
+              value={farmData.reportLanguage || "Hindi"}
+              onChange={handleChange}
+              className="input-field"
+            >
+              {INDIAN_LANGUAGES.map(lang => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="input-group">
+            <div className="input-label">✍️ Script / Transliteration</div>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="radio"
+                  name="reportScript"
+                  value="Native script"
+                  checked={farmData.reportScript === "Native script"}
+                  onChange={handleChange}
+                />
+                Native script
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="radio"
+                  name="reportScript"
+                  value="Roman (transliterated)"
+                  checked={farmData.reportScript === "Roman (transliterated)"}
+                  onChange={handleChange}
+                />
+                Roman (transliterated)
+              </label>
+            </div>
+          </div>
+
+          <button
+            onClick={onGenerateReport}
+            disabled={loadingReport}
+            style={{
+              marginTop: '20px',
+              backgroundColor: 'var(--emerald-500)',
+              border: 'none',
+              padding: '12px',
+              borderRadius: '8px',
+              color: 'white',
+              fontWeight: 'bold',
+              cursor: loadingReport ? 'not-allowed' : 'pointer',
+              width: '100%',
+              opacity: loadingReport ? 0.7 : 1,
+              transition: '0.2s'
+            }}
+          >
+            {loadingReport ? '⏳ Generating Report...' : '📄 Download Detailed Report'}
+          </button>
         </div>
       </div>
     </div>
